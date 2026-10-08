@@ -1,0 +1,22 @@
+{
+  "name": "follower-analyzer",
+  "version": "1.0.0",
+  "description": "Client-side Instagram follower analyzer",
+  "main": "electron/main.js",
+  "scripts": {
+    "build:web": "mkdir -p www && cp index.html app.js styles.css www/",
+    "start:desktop": "npm run build:web && electron .",
+    "build:win": "npm run build:web && electron-builder --win portable --x64",
+    "build:mac": "npm run build:web && electron-builder --mac dmg",
+    "cap:android": "npm run build:web && cap add android && cap sync android",
+    "build:android": "npm run cap:android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": { "@capacitor/android": "^6.1.0", "@capacitor/core": "^6.1.0" },
+  "devDependencies": { "@capacitor/cli": "^6.1.0", "electron": "^31.0.0", "electron-builder": "^24.13.3" },
+  "build": {
+    "appId": "app.followeranalyzer",
+    "productName": "Follower Analyzer",
+    "files": ["electron/**", "www/**"],
+    "directories": { "output": "dist" }
+  }
+}

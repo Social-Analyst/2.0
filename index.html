@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Follower Analyzer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased">
+<div id="tos-root"></div>
+<div id="app" class="hidden min-h-screen flex flex-col md:flex-row">
+  <nav class="md:w-56 md:min-h-screen bg-zinc-900 border-b md:border-b-0 md:border-r border-zinc-800 p-3 flex md:flex-col gap-1 overflow-x-auto">
+    <button data-panel="login" class="nav">🔑 Login</button>
+    <button data-panel="nonfollowers" class="nav">🚫 Non-followers</button>
+    <button data-panel="followers" class="nav">👥 Followers</button>
+    <button data-panel="whitelist" class="nav">⭐ Whitelist</button>
+    <button data-panel="spam" class="nav">🤖 Spam audit</button>
+    <button data-panel="chat" class="nav">💬 Chat cleaner</button>
+    <button id="stop" class="nav mt-auto text-red-400">⏹ Stop task</button>
+  </nav>
+  <main id="view" class="flex-1 p-4 md:p-8 max-w-4xl"></main>
+</div>
+<div id="toast" class="hidden fixed bottom-4 right-4 bg-zinc-800 border border-zinc-600 rounded-lg px-4 py-2 text-sm z-40"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+.nav{padding:.55rem .8rem;border-radius:.5rem;text-align:left;white-space:nowrap;font-size:.9rem;color:#a1a1aa}
+.nav:hover,.nav.active{background:#27272a;color:#fafafa}
+.btn{background:#0ea5e9;color:#04121c;padding:.5rem 1rem;border-radius:.5rem;font-weight:600}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.alt{background:#27272a;color:#fafafa}
+.row{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.6rem .8rem;border-bottom:1px solid #27272a}
+.badge{font-size:.72rem;padding:.1rem .5rem;border-radius:999px;background:#3f3f46}
+.badge.gold{background:#facc15;color:#1c1500}
+.switch{position:relative;display:inline-block;width:46px;height:26px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:#3f3f46;border-radius:999px;transition:.2s;cursor:pointer}
+.switch span::before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+span{background:#0ea5e9}
+.switch input:checked+span::before{transform:translateX(20px)}
+:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}

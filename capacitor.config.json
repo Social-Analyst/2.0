@@ -1,0 +1,6 @@
+{
+  "appId": "app.followeranalyzer",
+  "appName": "Follower Analyzer",
+  "webDir": "www",
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}
