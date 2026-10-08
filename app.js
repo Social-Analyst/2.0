@@ -96,15 +96,18 @@ async function runProfileScan() {
   const s = await getSetting('session'); if (!s) return toast('Log in first');
   cancel = false; toast('Scanning…');
   const fers = await fetchList('followers', s.userId), fing = await fetchList('following', s.userId);
-  const fSet = new Set(fers.map(u => u.username)), gSet = new Set(fing.map(u => u.username)), now = Date.now();
+  await applyScan(fers, fing);
+}
+async function applyScan(fers, fing, pending = []) {
+  const fSet = new Set(fers.map(u => u.username)), gSet = new Set(fing.map(u => u.username)), pSet = new Set(pending.map(u => u.username)), now = Date.now();
   const old = Object.fromEntries((await dbAll('tracked_accounts')).map(a => [a.username, a]));
-  for (const u of [...fing, ...fers.filter(u => !gSet.has(u.username))]) {
-    const status = gSet.has(u.username) ? (fSet.has(u.username) ? 'mutual' : 'non_follower') : 'follower';
+  for (const u of [...fing, ...fers.filter(u => !gSet.has(u.username)), ...pending.filter(u => !gSet.has(u.username))]) {
+    const status = gSet.has(u.username) ? (fSet.has(u.username) ? 'mutual' : 'non_follower') : pSet.has(u.username) ? 'non_follower' : 'follower';
     const o = old[u.username] || {};
-    await dbPut('tracked_accounts', { ...o, ...u, url: 'https://instagram.com/' + u.username, status, timestamp: now,
+    await dbPut('tracked_accounts', { ...o, ...u, url: 'https://instagram.com/' + u.username, pending: pSet.has(u.username), status, timestamp: now,
       detected_at: status === 'non_follower' ? (o.status === 'non_follower' ? o.detected_at : now) : null });
   }
-  for (const a of Object.values(old)) if (!fSet.has(a.username) && !gSet.has(a.username)) await dbDel('tracked_accounts', a.username);
+  for (const a of Object.values(old)) if (!fSet.has(a.username) && !gSet.has(a.username) && !pSet.has(a.username)) await dbDel('tracked_accounts', a.username);
   await setSetting('last_scan', now); toast('Scan complete'); show('nonfollowers');
 }
 const whitelistSet = async () => new Set((await dbAll('whitelist')).filter(w => w.type !== 'chat' && w.whitelisted).map(w => w.username));
@@ -212,10 +215,47 @@ async function unsendMessageByMessage(threadId, onCount) {
   return n;
 }
 
+// === EXPORT IMPORT (works in any browser, no login) ===
+const uniq = a => [...new Map(a.map(u => [u.username, u])).values()];
+function igNames(data) {
+  const arr = Array.isArray(data) ? data : Object.values(data || {}).find(Array.isArray) || [];
+  return arr.map(e => { const s = e.string_list_data?.[0] || {}; return s.value || e.title || (s.href || '').split('/').filter(Boolean).pop(); })
+    .filter(Boolean).map(n => ({ username: String(n) }));
+}
+async function importExport(files) {
+  const fers = [], fing = [], pend = [];
+  for (const f of files) {
+    const n = f.name.toLowerCase(); let j;
+    try { j = JSON.parse(await f.text()); } catch { continue; }
+    if (n.startsWith('followers')) fers.push(...igNames(j));
+    else if (n.startsWith('following')) fing.push(...igNames(j));
+    else if (n.includes('pending_follow_requests') || n.includes('follow_requests_sent')) pend.push(...igNames(j));
+  }
+  if (!fers.length || !fing.length) return toast('Select followers_1.json and following.json (JSON format)');
+  await applyScan(uniq(fers), uniq(fing), uniq(pend));
+}
+const releaseUrl = () => { const r = location.pathname.split('/')[1]; return location.hostname.endsWith('.github.io') && r ? `https://github.com/${location.hostname.split('.')[0]}/${r}/releases/latest` : ''; };
+
 // === UI ===
-const toggle = (id, on) => `<label class="switch"><input id="${id}" type="checkbox" ${on ? 'checked' : ''}><span></span></label>`;
+const canAct = () => !!(window.native || window.Capacitor?.isNativePlatform?.());
+const toggle = (id, on, dis) => `<label class="switch"><input id="${id}" type="checkbox" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span></span></label>`;
 const people = (arr, extra = () => '') => arr.length ? arr.map(a => `<div class="row"><div>${igLink(a.username)} ${extra(a)}</div></div>`).join('') : '<p class="text-zinc-400 p-4">Nothing here yet. Run a scan from Non-followers.</p>';
 const views = {
+  async importer() {
+    const rel = releaseUrl();
+    return `<h1 class="text-2xl font-semibold mb-2">Import your Instagram data</h1>
+      <p class="text-zinc-400 mb-4 max-w-prose">No login needed. Files never leave this device.</p>
+      <ol class="list-decimal ml-5 space-y-1 text-sm text-zinc-300 mb-4 max-w-prose">
+        <li>In Instagram, open Accounts Center → Your information and permissions → Download your information (menu names can vary).</li>
+        <li>Choose your Instagram profile, select <b>Followers and following</b>, date range <b>All time</b>, format <b>JSON</b>.</li>
+        <li>Download the ZIP when Instagram emails you, then unzip it. The files are in <code>connections/followers_and_following</code>.</li>
+        <li>Select <code>followers_1.json</code> (and any other followers files), <code>following.json</code>, and optionally <code>pending_follow_requests.json</code>.</li>
+      </ol>
+      <input id="ex-files" type="file" accept=".json,application/json" multiple class="block mb-3 text-sm">
+      <button id="do-import" class="btn">Import and analyze</button>
+      <p class="text-xs text-zinc-500 mt-4 max-w-prose">Import a fresh export every few days. Each account's 3-day grace timer starts at the first import where it shows as a non-follower and carries over to later imports.</p>
+      ${rel ? `<p class="mt-6 text-sm"><a class="text-sky-400 hover:underline" href="${rel}" target="_blank" rel="noopener noreferrer">Desktop and Android apps (latest release)</a></p>` : ''}`;
+  },
   async login() {
     const s = await getSetting('session');
     return `<h1 class="text-2xl font-semibold mb-2">Login</h1>
@@ -230,9 +270,9 @@ const views = {
     const state = a => wl.has(a.username) ? '<span class="badge">Whitelisted</span>' : a.is_celebrity ? '<span class="badge gold">Celebrity Account</span>'
       : Date.now() - a.detected_at >= GRACE ? '<span class="badge" style="background:#7f1d1d">Past grace period</span>' : `<span class="badge">${Math.ceil((GRACE - (Date.now() - a.detected_at)) / 864e5)}d left</span>`;
     return `<div class="flex justify-between items-center mb-4"><h1 class="text-2xl font-semibold">Non-followers <span class="text-zinc-500 text-base">${all.length}</span></h1><button id="do-scan" class="btn">Scan now</button></div>
-      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-4"><div class="flex justify-between items-center"><b>Auto-unfollow</b>${toggle('enableAutoUnfollow', on)}</div>
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-4"><div class="flex justify-between items-center"><b>Auto-unfollow</b>${toggle('enableAutoUnfollow', on, !canAct())}</div>
       <p class="text-sm text-zinc-400 mt-2">This feature allows the app to automatically unfollow accounts that do not follow you back, or cancel pending follow requests that remain unanswered. To protect your account, actions are safely delayed and calculated using a 3-day grace period. You can completely exclude close friends, family, or specific accounts by adding them to your Whitelist.</p>
-      <p class="text-xs text-zinc-500 mt-2">${due.length} past grace period · ${soon.length} still in grace period</p></div>
+      ${canAct() ? '' : '<p class="text-xs text-amber-400 mt-2">Auto-unfollow runs only in the desktop build. Here, open each account link to unfollow manually once it is past the grace period.</p>'}<p class="text-xs text-zinc-500 mt-2">${due.length} past grace period · ${soon.length} still in grace period</p></div>
       <div class="bg-zinc-900 border border-zinc-800 rounded-xl">${people(all, state)}</div>`;
   },
   async followers() {
@@ -263,6 +303,7 @@ async function show(name) {
 }
 async function task(fn) { try { await fn(); } catch (e) { toast(e.message); } }
 function bind(name) {
+  if (name === 'importer') $('#do-import').onclick = () => task(() => importExport([...$('#ex-files').files]));
   if (name === 'login') $('#do-login').onclick = () => task(captureWebViewSession);
   if (name === 'nonfollowers') {
     $('#do-scan').onclick = () => task(runProfileScan);
@@ -298,7 +339,7 @@ function bind(name) {
   $('#app').classList.remove('hidden');
   document.querySelectorAll('.nav[data-panel]').forEach(b => b.onclick = () => show(b.dataset.panel));
   $('#stop').onclick = () => { cancel = true; toast('Stopping after the current step'); };
-  show(await getSetting('session') ? 'nonfollowers' : 'login');
+  show((await getSetting('session')) || (await dbAll('tracked_accounts')).length ? 'nonfollowers' : (window.native ? 'login' : 'importer'));
   const tick = () => { runAutoUnfollow(); sendDailySummaryNotification().catch(() => {}); };
   setTimeout(tick, 5000); setInterval(tick, 30 * 60 * 1000);
 })();
