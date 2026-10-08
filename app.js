@@ -254,7 +254,7 @@ const views = {
       <input id="ex-files" type="file" accept=".json,application/json" multiple class="block mb-3 text-sm">
       <button id="do-import" class="btn">Import and analyze</button>
       <p class="text-xs text-zinc-500 mt-4 max-w-prose">Import a fresh export every few days. Each account's 3-day grace timer starts at the first import where it shows as a non-follower and carries over to later imports.</p>
-      ${rel ? `<p class="mt-6 text-sm"><a class="text-sky-400 hover:underline" href="${rel}" target="_blank" rel="noopener noreferrer">Desktop and Android apps (latest release)</a></p>` : ''}`;
+      ${rel ? '<p id="rel" class="mt-6 text-sm text-zinc-500">Checking for app downloads…</p>' : ''}`;
   },
   async login() {
     const s = await getSetting('session');
@@ -304,6 +304,10 @@ async function show(name) {
 async function task(fn) { try { await fn(); } catch (e) { toast(e.message); } }
 function bind(name) {
   if (name === 'importer') $('#do-import').onclick = () => task(() => importExport([...$('#ex-files').files]));
+  if (name === 'importer' && releaseUrl()) fetch(releaseUrl().replace('https://github.com/', 'https://api.github.com/repos/')).then(r => r.ok ? r.json() : null).then(j => {
+    $('#rel').innerHTML = j ? `<a class="text-sky-400 hover:underline" href="${esc(j.html_url)}" target="_blank" rel="noopener noreferrer">Download desktop and Android apps (${esc(j.name)})</a>`
+      : 'App downloads are not published yet. The build must succeed in the repo\'s Actions tab first.';
+  }).catch(() => {});
   if (name === 'login') $('#do-login').onclick = () => task(captureWebViewSession);
   if (name === 'nonfollowers') {
     $('#do-scan').onclick = () => task(runProfileScan);

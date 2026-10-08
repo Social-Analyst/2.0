@@ -46,6 +46,7 @@ jobs:
 
   desktop:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { os: windows-latest, script: "build:win", name: windows, glob: "dist/*.exe" }
@@ -67,6 +68,7 @@ jobs:
 
   release:
     needs: [android, desktop]
+    if: ${{ !cancelled() && (needs.android.result == 'success' || needs.desktop.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
